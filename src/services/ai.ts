@@ -3,21 +3,52 @@ import type { Message } from "./llm/provider.js";
 import { logger } from "../utils/logger.js";
 
 /**
- * Parse a JSON response from the LLM, handling markdown code blocks.
+ * Parse a JSON response from the LLM, handling markdown code blocks
+ * and truncated responses.
  */
 function parseJsonResponse<T>(raw: string): T {
-  // Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
   let cleaned = raw.trim();
+
+  // Try to extract from complete code blocks first
   const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
   if (codeBlockMatch) {
     cleaned = codeBlockMatch[1].trim();
+  } else if (cleaned.startsWith("```")) {
+    // Handle unclosed code blocks (truncated response)
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").trim();
+  }
+
+  // Extract the JSON object from surrounding text
+  const jsonStart = cleaned.indexOf("{");
+  if (jsonStart >= 0) {
+    cleaned = cleaned.slice(jsonStart);
   }
 
   try {
     return JSON.parse(cleaned) as T;
-  } catch (e) {
-    logger.error({ raw, error: e }, "Failed to parse LLM JSON response");
-    throw new Error(`Failed to parse LLM response as JSON: ${(e as Error).message}`);
+  } catch {
+    // Try to repair truncated JSON by closing brackets
+    let repaired = cleaned;
+    const opens = (repaired.match(/\{/g) || []).length;
+    const closes = (repaired.match(/\}/g) || []).length;
+
+    if (opens > closes) {
+      // Remove trailing incomplete value (truncated string, etc.)
+      repaired = repaired.replace(/,?\s*"[^"]*$/, "");
+      // Remove trailing incomplete key-value
+      repaired = repaired.replace(/,?\s*"[^"]*":\s*"?[^"{}[\]]*$/, "");
+      // Close any open strings/arrays
+      const unclosedArray = (repaired.match(/\[/g) || []).length - (repaired.match(/\]/g) || []).length;
+      for (let i = 0; i < unclosedArray; i++) repaired += "]";
+      for (let i = 0; i < opens - closes; i++) repaired += "}";
+    }
+
+    try {
+      return JSON.parse(repaired) as T;
+    } catch (e2) {
+      logger.error({ raw: raw.slice(0, 500), error: e2 }, "Failed to parse LLM JSON response");
+      throw new Error(`Failed to parse LLM response as JSON: ${(e2 as Error).message}`);
+    }
   }
 }
 
@@ -70,7 +101,6 @@ export async function summarizeContent(
   logger.info("Requesting LLM summarization");
   const response = await llm.chat(messages, {
     temperature: 0.3,
-    maxTokens: 1024,
   });
 
   const result = parseJsonResponse<SummarizeResult>(response);
@@ -156,7 +186,6 @@ export async function extractMemoryFacts(
   logger.info("Requesting LLM memory fact extraction");
   const response = await llm.chat(messages, {
     temperature: 0.2,
-    maxTokens: 2048,
   });
 
   const result = parseJsonResponse<ExtractMemoryResult>(response);

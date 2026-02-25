@@ -1,10 +1,17 @@
 import { Bot } from "grammy";
-import { logger } from "../utils/logger.js";
 import { handleMemo } from "./handlers/memo.js";
 import { handleUrl } from "./handlers/url.js";
 import { handleSearch } from "./handlers/search.js";
+import { handleInsight } from "./handlers/insight.js";
+import { handleRandom } from "./handlers/random.js";
+import { handleStats } from "./handlers/stats.js";
+import { handleDelete } from "./handlers/delete.js";
+import { handleExport } from "./handlers/export.js";
+import { handleImage } from "./handlers/image.js";
+import { handlePdf } from "./handlers/pdf.js";
 import { getRecentItems } from "../db/items.js";
 import { getAllTags, getItemsByTag } from "../db/tags.js";
+import { logger } from "../utils/logger.js";
 
 /** Simple regex to detect URLs in a message. */
 const URL_REGEX = /https?:\/\/\S+/;
@@ -34,12 +41,32 @@ export function registerCommands(bot: Bot): void {
         "/search <クエリ> — 検索\n" +
         "/recent — 最近の保存\n" +
         "/tags — タグ一覧\n" +
-        "/tag <タグ名> — タグで絞り込み",
+        "/tag <タグ名> — タグで絞り込み\n" +
+        "/insight — 学習した関心・カテゴリ\n" +
+        "/random — ランダムに1件表示\n" +
+        "/stats — 統計情報\n" +
+        "/delete <ID> — アイテム削除\n" +
+        "/export — データエクスポート",
     ),
   );
 
-  // /search - Full-text search
+  // /search - Hybrid search (FTS5 + PageIndex + LLM reranking)
   bot.command("search", handleSearch);
+
+  // /insight - Memory insights
+  bot.command("insight", handleInsight);
+
+  // /random - Random item for serendipitous rediscovery
+  bot.command("random", handleRandom);
+
+  // /stats - Database statistics
+  bot.command("stats", handleStats);
+
+  // /delete <ID> - Delete an item
+  bot.command("delete", handleDelete);
+
+  // /export - Export all data as JSON file
+  bot.command("export", handleExport);
 
   // /recent - Show recent items
   bot.command("recent", async (ctx) => {
@@ -139,11 +166,16 @@ export function registerCommands(bot: Bot): void {
     }
   });
 
-  // Stubs for future phases
-  bot.command("random", (ctx) => ctx.reply("🚧 準備中..."));
-  bot.command("stats", (ctx) => ctx.reply("🚧 準備中..."));
-  bot.command("delete", (ctx) => ctx.reply("🚧 準備中..."));
-  bot.command("export", (ctx) => ctx.reply("🚧 準備中..."));
+  // Handle photo messages (image OCR via Gemini Vision)
+  bot.on("message:photo", handleImage);
+  bot.on("message:document", async (ctx) => {
+    const doc = ctx.message.document;
+    if (doc.mime_type?.startsWith("image/")) {
+      await handleImage(ctx);
+    } else if (doc.mime_type === "application/pdf") {
+      await handlePdf(ctx);
+    }
+  });
 
   // Default: handle text messages — detect URL vs plain memo
   bot.on("message:text", async (ctx) => {

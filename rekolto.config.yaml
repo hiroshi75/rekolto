@@ -1,12 +1,12 @@
 telegram:
   bot_token: ${TELEGRAM_BOT_TOKEN}
-  allowed_users: []  # 自分の Telegram user ID を追加
+  allowed_users: [8593800326]  # 自分の Telegram user ID を追加
 
 llm:
   profiles:
     default:
       provider: google
-      model: gemini-2.0-flash
+      model: gemini-2.5-flash
       api_key: ${GOOGLE_API_KEY}
 
 pageindex:

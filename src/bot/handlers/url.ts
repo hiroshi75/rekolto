@@ -4,7 +4,9 @@ import { scrapeUrl } from "../../services/scraper.js";
 import { summarizeContent, extractMemoryFacts } from "../../services/ai.js";
 import { createItem } from "../../db/items.js";
 import { addTagsToItem } from "../../db/tags.js";
-import { findOrCreateCategory, createMemoryItem } from "../../db/memory-store.js";
+import { findOrCreateCategory, createMemoryItem, getAllCategories } from "../../db/memory-store.js";
+import { suggestCategory, summarizeCategory } from "../../memory/categorize.js";
+import { getProactiveSuggestions } from "../../memory/proactive.js";
 
 /**
  * Handle messages containing URLs.
@@ -38,9 +40,17 @@ export async function handleUrl(ctx: Context, url: string): Promise<void> {
       addTagsToItem(item.id, summary.tags);
     }
 
+    // Use LLM-based category suggestion for better categorization
+    const existingCategories = getAllCategories().map((c) => c.name);
+    const categoryName = memoryResult.facts.length > 0
+      ? await suggestCategory(scraped.content, existingCategories)
+      : memoryResult.category;
+
     // Store memory facts
+    let categoryId: number | null = null;
     for (const fact of memoryResult.facts) {
-      const category = findOrCreateCategory(memoryResult.category);
+      const category = findOrCreateCategory(categoryName);
+      categoryId = category.id;
       createMemoryItem({
         category_id: category.id,
         type: fact.type,
@@ -72,7 +82,22 @@ export async function handleUrl(ctx: Context, url: string): Promise<void> {
       responseText,
     );
 
-    logger.info({ itemId: item.id, url, title: scraped.title, type: summary.type }, "URL saved");
+    logger.info({ itemId: item.id, url, title: scraped.title, type: summary.type, category: categoryName }, "URL saved");
+
+    // Proactive suggestions (non-blocking, separate message)
+    if (categoryId !== null) {
+      summarizeCategory(categoryId).catch(() => {});
+
+      getProactiveSuggestions({ newItemCategory: categoryName }).then(async (suggestions) => {
+        if (suggestions.length > 0) {
+          const sugLines = ["💡 関連する提案:"];
+          for (const s of suggestions) {
+            sugLines.push(`  • ${s}`);
+          }
+          await ctx.reply(sugLines.join("\n")).catch(() => {});
+        }
+      }).catch(() => {});
+    }
   } catch (err) {
     logger.error({ err, url }, "Failed to handle URL");
 

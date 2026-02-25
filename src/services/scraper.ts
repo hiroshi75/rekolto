@@ -1,12 +1,30 @@
 import * as cheerio from "cheerio";
 import { loadConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
+import { getBrowserRelay } from "./browser-relay.js";
 
 export interface ScrapedContent {
   title: string;
   content: string;
   ogImage?: string;
   publishedDate?: string;
+}
+
+/** Domains that typically require a real browser (JS-rendered content, login walls). */
+const RELAY_DOMAINS = ["x.com", "twitter.com"];
+
+/**
+ * Check whether a URL's domain is one that needs the browser relay.
+ */
+export function needsBrowserRelay(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname;
+    return RELAY_DOMAINS.some(
+      (d) => hostname === d || hostname.endsWith(`.${d}`)
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -33,6 +51,27 @@ async function fetchHtml(url: string, timeoutMs: number): Promise<string> {
     return await response.text();
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Try to fetch HTML via browser relay. Returns null if relay is unavailable.
+ */
+async function fetchHtmlViaRelay(
+  url: string
+): Promise<{ html: string; relayTitle?: string } | null> {
+  const relay = getBrowserRelay();
+  if (!relay || !relay.isConnected()) {
+    return null;
+  }
+
+  try {
+    logger.info({ url }, "Fetching via browser relay");
+    const result = await relay.fetchPage(url);
+    return { html: result.html, relayTitle: result.title };
+  } catch (err) {
+    logger.warn({ err, url }, "Browser relay fetch failed, falling back to HTTP");
+    return null;
   }
 }
 
@@ -128,6 +167,7 @@ function cleanText(text: string): string {
 
 /**
  * Scrape a URL and extract title, content, og:image, and published date.
+ * For RELAY_DOMAINS, tries the browser relay first, then falls back to HTTP.
  */
 export async function scrapeUrl(url: string): Promise<ScrapedContent> {
   const config = loadConfig();
@@ -135,10 +175,29 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
 
   logger.info({ url }, "Scraping URL");
 
-  const html = await fetchHtml(url, timeout_ms);
+  let html: string;
+  let relayTitle: string | undefined;
+
+  // For relay domains, try browser relay first
+  if (needsBrowserRelay(url)) {
+    const relayResult = await fetchHtmlViaRelay(url);
+    if (relayResult) {
+      html = relayResult.html;
+      relayTitle = relayResult.relayTitle;
+    } else {
+      // Fallback to HTTP fetch
+      html = await fetchHtml(url, timeout_ms);
+    }
+  } else {
+    html = await fetchHtml(url, timeout_ms);
+  }
+
   const $ = cheerio.load(html);
 
-  const { title, ogImage, publishedDate } = extractMetadata($);
+  const { title: extractedTitle, ogImage, publishedDate } = extractMetadata($);
+  // Use relay title if available, otherwise extracted title
+  const title = relayTitle || extractedTitle;
+
   let content = extractContent($);
 
   // Truncate content if it exceeds the configured max length
