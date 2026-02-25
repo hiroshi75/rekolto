@@ -1,0 +1,35 @@
+telegram:
+  bot_token: ${TELEGRAM_BOT_TOKEN}
+  allowed_users: []  # 自分の Telegram user ID を追加
+
+llm:
+  profiles:
+    default:
+      provider: google
+      model: gemini-2.0-flash
+      api_key: ${GOOGLE_API_KEY}
+
+pageindex:
+  llm_profile: default
+  max_pages_per_node: 10
+  min_content_length_for_tree: 3000
+
+memory:
+  salience:
+    decay_rate: 0.01
+    access_boost: 0.1
+  proactive:
+    enabled: true
+    max_suggestions: 3
+
+browser_relay:
+  enabled: false
+  ws_port: 9222
+
+scraper:
+  timeout_ms: 10000
+  max_content_length: 50000
+
+database:
+  path: ./data/rekolto.db
+  backup_dir: ./data/backups
