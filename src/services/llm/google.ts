@@ -24,7 +24,9 @@ export class GoogleProvider implements LLMProvider {
     const chatMessages = messages.filter((m) => m.role !== "system");
 
     const chat = model.startChat({
-      systemInstruction: systemMessage?.content,
+      systemInstruction: systemMessage
+        ? { role: "user", parts: [{ text: systemMessage.content }] }
+        : undefined,
       history: chatMessages.slice(0, -1).map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
