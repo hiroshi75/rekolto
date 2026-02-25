@@ -1,0 +1,190 @@
+import { getLLM } from "./llm/index.js";
+import type { Message } from "./llm/provider.js";
+import { logger } from "../utils/logger.js";
+
+/**
+ * Parse a JSON response from the LLM, handling markdown code blocks.
+ */
+function parseJsonResponse<T>(raw: string): T {
+  // Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
+  let cleaned = raw.trim();
+  const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  if (codeBlockMatch) {
+    cleaned = codeBlockMatch[1].trim();
+  }
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch (e) {
+    logger.error({ raw, error: e }, "Failed to parse LLM JSON response");
+    throw new Error(`Failed to parse LLM response as JSON: ${(e as Error).message}`);
+  }
+}
+
+// --- Summarization & Tagging ---
+
+export interface SummarizeResult {
+  summary: string;
+  tags: string[];
+  type: "article" | "memo" | "code" | "idea" | "reference";
+}
+
+const SUMMARIZE_SYSTEM_PROMPT = `あなたはナレッジ管理アシスタントです。与えられたコンテンツを分析し、以下のJSON形式で返してください。
+
+{
+  "summary": "2〜3行の日本語要約",
+  "tags": ["tag-one", "tag-two"],
+  "type": "article"
+}
+
+ルール:
+- summary: 2〜3行の簡潔な日本語要約を生成してください。
+- tags: 最大5つまで。小文字のkebab-case（例: "machine-learning", "web-dev", "rust-lang"）。内容の主要トピックを反映してください。
+- type: 以下のいずれかを選択:
+  - "article": ブログ記事やニュース記事
+  - "memo": 個人的なメモや覚書
+  - "code": コードスニペットや技術的な実装
+  - "idea": アイデアや構想
+  - "reference": ドキュメントやリファレンス資料
+
+JSON以外のテキストは含めないでください。`;
+
+/**
+ * Summarize content and generate tags using the LLM.
+ */
+export async function summarizeContent(
+  content: string,
+  title?: string
+): Promise<SummarizeResult> {
+  const llm = getLLM("default");
+
+  const userContent = title
+    ? `タイトル: ${title}\n\n${content}`
+    : content;
+
+  const messages: Message[] = [
+    { role: "system", content: SUMMARIZE_SYSTEM_PROMPT },
+    { role: "user", content: userContent },
+  ];
+
+  logger.info("Requesting LLM summarization");
+  const response = await llm.chat(messages, {
+    temperature: 0.3,
+    maxTokens: 1024,
+  });
+
+  const result = parseJsonResponse<SummarizeResult>(response);
+
+  // Validate and sanitize the result
+  if (!result.summary || typeof result.summary !== "string") {
+    throw new Error("LLM response missing 'summary' field");
+  }
+
+  // Ensure tags is an array of strings, max 5
+  if (!Array.isArray(result.tags)) {
+    result.tags = [];
+  }
+  result.tags = result.tags
+    .filter((t): t is string => typeof t === "string")
+    .map((t) => t.toLowerCase().replace(/\s+/g, "-"))
+    .slice(0, 5);
+
+  // Validate type
+  const validTypes = ["article", "memo", "code", "idea", "reference"] as const;
+  if (!validTypes.includes(result.type)) {
+    result.type = "article";
+  }
+
+  logger.info(
+    { summary: result.summary.slice(0, 80), tags: result.tags, type: result.type },
+    "Summarization complete"
+  );
+
+  return result;
+}
+
+// --- Memory Fact Extraction ---
+
+export interface MemoryFact {
+  content: string;
+  type: "knowledge" | "profile" | "skill";
+}
+
+export interface ExtractMemoryResult {
+  facts: MemoryFact[];
+  category: string;
+}
+
+const EXTRACT_MEMORY_SYSTEM_PROMPT = `あなたはナレッジ管理アシスタントです。与えられたコンテンツから重要な知識・事実を抽出し、以下のJSON形式で返してください。
+
+{
+  "facts": [
+    { "content": "事実の内容", "type": "knowledge" }
+  ],
+  "category": "カテゴリ名"
+}
+
+ルール:
+- facts: コンテンツから重要な知識・事実を抽出してください。各事実は簡潔な1文にまとめてください。
+  - type は以下のいずれか:
+    - "knowledge": 一般的な知識や技術的事実
+    - "profile": ユーザーの好みや属性に関する情報
+    - "skill": 技術やスキルに関する情報
+  - 最大10個まで抽出してください。
+- category: コンテンツの分野を表す短いカテゴリ名（日本語可、例: "Rust", "AI/ML", "Web開発", "データベース"）
+
+JSON以外のテキストは含めないでください。`;
+
+/**
+ * Extract key facts and knowledge from content using the LLM.
+ */
+export async function extractMemoryFacts(
+  content: string,
+  title?: string
+): Promise<ExtractMemoryResult> {
+  const llm = getLLM("default");
+
+  const userContent = title
+    ? `タイトル: ${title}\n\n${content}`
+    : content;
+
+  const messages: Message[] = [
+    { role: "system", content: EXTRACT_MEMORY_SYSTEM_PROMPT },
+    { role: "user", content: userContent },
+  ];
+
+  logger.info("Requesting LLM memory fact extraction");
+  const response = await llm.chat(messages, {
+    temperature: 0.2,
+    maxTokens: 2048,
+  });
+
+  const result = parseJsonResponse<ExtractMemoryResult>(response);
+
+  // Validate and sanitize the result
+  if (!Array.isArray(result.facts)) {
+    result.facts = [];
+  }
+
+  const validFactTypes = ["knowledge", "profile", "skill"] as const;
+  result.facts = result.facts
+    .filter(
+      (f): f is MemoryFact =>
+        f != null &&
+        typeof f.content === "string" &&
+        f.content.length > 0 &&
+        validFactTypes.includes(f.type as (typeof validFactTypes)[number])
+    )
+    .slice(0, 10);
+
+  if (!result.category || typeof result.category !== "string") {
+    result.category = "General";
+  }
+
+  logger.info(
+    { factCount: result.facts.length, category: result.category },
+    "Memory fact extraction complete"
+  );
+
+  return result;
+}
