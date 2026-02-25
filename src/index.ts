@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createBot } from "./bot/bot.js";
 import { initDatabase } from "./db/database.js";
 import { startBrowserRelay } from "./services/browser-relay.js";
+import { startXCrawler } from "./services/x-crawler.js";
 import { logger } from "./utils/logger.js";
 
 async function main() {
@@ -12,6 +13,9 @@ async function main() {
 
   // Start browser relay WS server (if enabled in config)
   startBrowserRelay();
+
+  // Start X/Twitter periodic crawler (if enabled in config)
+  startXCrawler();
 
   // Start Telegram bot
   const bot = createBot();

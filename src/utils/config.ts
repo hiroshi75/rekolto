@@ -37,6 +37,12 @@ export interface Config {
     path: string;
     backup_dir: string;
   };
+  x_crawler: {
+    enabled: boolean;
+    interval_hours: number;
+    max_items_per_crawl: number;
+    timeline_url: string;
+  };
 }
 
 function resolveEnvVars(value: string): string {

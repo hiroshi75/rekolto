@@ -133,6 +133,76 @@ export async function summarizeContent(
   return result;
 }
 
+// --- Tweet Filtering ---
+
+export interface TweetData {
+  text: string;
+  author?: string;
+  url?: string;
+}
+
+export interface FilteredTweet {
+  index: number;
+  reason: string;
+}
+
+const FILTER_TWEETS_SYSTEM_PROMPT = `あなたはナレッジキュレーターです。ユーザーの興味・関心に基づいて、ツイート/ポストのリストからユーザーにとって価値のあるものをフィルタリングしてください。
+
+以下のJSON形式で返してください:
+{
+  "selected": [
+    { "index": 0, "reason": "選択理由" }
+  ]
+}
+
+ルール:
+- ユーザーの興味カテゴリやタグに関連するツイートのみ選択
+- 一般的な雑談、挨拶、個人的なツイートは除外
+- 技術的な知見、ニュース、学びのあるツイートを優先
+- 各ツイートのindexは入力リストの0-based index
+- reasonは簡潔に日本語で
+
+JSON以外のテキストは含めないでください。`;
+
+/**
+ * Filter tweets by relevance to user's interests using the LLM.
+ */
+export async function filterRelevantTweets(
+  tweets: TweetData[],
+  interests: { categories: string[]; tags: string[] }
+): Promise<FilteredTweet[]> {
+  if (tweets.length === 0) return [];
+
+  const llm = getLLM("default");
+
+  const tweetList = tweets
+    .map((t, i) => `[${i}] ${t.author ? `@${t.author}: ` : ""}${t.text}`)
+    .join("\n\n");
+
+  const userContent = `## ユーザーの興味・関心
+カテゴリ: ${interests.categories.join(", ") || "なし"}
+タグ: ${interests.tags.join(", ") || "なし"}
+
+## ツイート一覧
+${tweetList}`;
+
+  const messages: Message[] = [
+    { role: "system", content: FILTER_TWEETS_SYSTEM_PROMPT },
+    { role: "user", content: userContent },
+  ];
+
+  logger.info({ tweetCount: tweets.length }, "Filtering tweets by relevance");
+  const response = await llm.chat(messages, { temperature: 0.2 });
+
+  const result = parseJsonResponse<{ selected: FilteredTweet[] }>(response);
+
+  if (!Array.isArray(result.selected)) return [];
+
+  return result.selected.filter(
+    (s) => typeof s.index === "number" && s.index >= 0 && s.index < tweets.length
+  );
+}
+
 // --- Memory Fact Extraction ---
 
 export interface MemoryFact {

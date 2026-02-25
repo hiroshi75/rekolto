@@ -44,3 +44,18 @@ export interface Stats {
   itemsByType: { type: string; count: number }[];
   recentItems: number;
 }
+
+export interface ChatSession {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  session_id: string;
+  query: string;
+  results: string | null; // JSON array of item IDs
+  created_at: string;
+}

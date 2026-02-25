@@ -156,6 +156,14 @@ export class BrowserRelayServer {
 let _relayServer: BrowserRelayServer | null = null;
 
 /**
+ * Get the browser relay server instance (even if extension is not connected).
+ * Returns null only if the server hasn't been started yet.
+ */
+export function getBrowserRelayServer(): BrowserRelayServer | null {
+  return _relayServer;
+}
+
+/**
  * Get the browser relay singleton.
  * Starts the WS server on first call if browser_relay is enabled in config.
  * Returns null if disabled or extension is not connected.

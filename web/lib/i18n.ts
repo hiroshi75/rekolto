@@ -73,6 +73,16 @@ export interface Dict {
   settings_heading: string;
   language: string;
   saved: string;
+
+  // Chat
+  new_chat: string;
+  chat_placeholder: string;
+  chat_send: string;
+  chat_empty: string;
+  chat_searching: string;
+  chat_no_results: string;
+  chat_delete_session: string;
+  chat_delete_confirm: string;
 }
 
 const en: Dict = {
@@ -128,6 +138,15 @@ const en: Dict = {
   settings_heading: "Settings",
   language: "Language",
   saved: "Saved!",
+
+  new_chat: "New Chat",
+  chat_placeholder: "Ask your knowledge base...",
+  chat_send: "Send",
+  chat_empty: "Start a conversation by typing a question below.",
+  chat_searching: "Searching...",
+  chat_no_results: "No results found.",
+  chat_delete_session: "Delete",
+  chat_delete_confirm: "Delete this chat?",
 };
 
 const ja: Dict = {
@@ -183,6 +202,15 @@ const ja: Dict = {
   settings_heading: "設定",
   language: "言語",
   saved: "保存しました！",
+
+  new_chat: "新しいチャット",
+  chat_placeholder: "ナレッジベースに質問...",
+  chat_send: "送信",
+  chat_empty: "下に質問を入力して会話を始めましょう。",
+  chat_searching: "検索中...",
+  chat_no_results: "結果が見つかりません。",
+  chat_delete_session: "削除",
+  chat_delete_confirm: "このチャットを削除しますか？",
 };
 
 const zhCN: Dict = {
@@ -238,6 +266,15 @@ const zhCN: Dict = {
   settings_heading: "设置",
   language: "语言",
   saved: "已保存！",
+
+  new_chat: "新对话",
+  chat_placeholder: "向知识库提问...",
+  chat_send: "发送",
+  chat_empty: "在下方输入问题开始对话。",
+  chat_searching: "搜索中...",
+  chat_no_results: "未找到结果。",
+  chat_delete_session: "删除",
+  chat_delete_confirm: "删除此对话？",
 };
 
 const zhTW: Dict = {
@@ -293,6 +330,15 @@ const zhTW: Dict = {
   settings_heading: "設定",
   language: "語言",
   saved: "已儲存！",
+
+  new_chat: "新對話",
+  chat_placeholder: "向知識庫提問...",
+  chat_send: "傳送",
+  chat_empty: "在下方輸入問題開始對話。",
+  chat_searching: "搜尋中...",
+  chat_no_results: "未找到結果。",
+  chat_delete_session: "刪除",
+  chat_delete_confirm: "刪除此對話？",
 };
 
 const es: Dict = {
@@ -348,6 +394,15 @@ const es: Dict = {
   settings_heading: "Ajustes",
   language: "Idioma",
   saved: "¡Guardado!",
+
+  new_chat: "Nuevo Chat",
+  chat_placeholder: "Pregunta a tu base de conocimiento...",
+  chat_send: "Enviar",
+  chat_empty: "Inicia una conversación escribiendo una pregunta abajo.",
+  chat_searching: "Buscando...",
+  chat_no_results: "No se encontraron resultados.",
+  chat_delete_session: "Eliminar",
+  chat_delete_confirm: "¿Eliminar este chat?",
 };
 
 const ptBR: Dict = {
@@ -403,6 +458,15 @@ const ptBR: Dict = {
   settings_heading: "Configurações",
   language: "Idioma",
   saved: "Salvo!",
+
+  new_chat: "Novo Chat",
+  chat_placeholder: "Pergunte à sua base de conhecimento...",
+  chat_send: "Enviar",
+  chat_empty: "Inicie uma conversa digitando uma pergunta abaixo.",
+  chat_searching: "Buscando...",
+  chat_no_results: "Nenhum resultado encontrado.",
+  chat_delete_session: "Excluir",
+  chat_delete_confirm: "Excluir este chat?",
 };
 
 const ko: Dict = {
@@ -458,6 +522,15 @@ const ko: Dict = {
   settings_heading: "설정",
   language: "언어",
   saved: "저장되었습니다!",
+
+  new_chat: "새 채팅",
+  chat_placeholder: "지식 베이스에 질문하세요...",
+  chat_send: "전송",
+  chat_empty: "아래에 질문을 입력하여 대화를 시작하세요.",
+  chat_searching: "검색 중...",
+  chat_no_results: "결과를 찾을 수 없습니다.",
+  chat_delete_session: "삭제",
+  chat_delete_confirm: "이 채팅을 삭제하시겠습니까?",
 };
 
 const DICTS: Record<Locale, Dict> = {

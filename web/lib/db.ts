@@ -4,9 +4,35 @@ import type { Item, Tag, MemoryCategory, MemoryItem, Stats } from "./types";
 
 const DB_PATH = path.resolve(process.cwd(), "../data/rekolto.db");
 
+let _migrated = false;
+
+function runWebMigrations(): void {
+  if (_migrated) return;
+  _migrated = true;
+  const db = getWriteDb();
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id         TEXT PRIMARY KEY,
+        title      TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    try {
+      db.exec(`ALTER TABLE search_history ADD COLUMN session_id TEXT REFERENCES chat_sessions(id) ON DELETE CASCADE`);
+    } catch {
+      // column already exists
+    }
+  } finally {
+    db.close();
+  }
+}
+
 let _db: Database.Database | null = null;
 
 function getDb(): Database.Database {
+  runWebMigrations();
   if (!_db) {
     _db = new Database(DB_PATH, { readonly: true });
     _db.pragma("journal_mode = WAL");
@@ -14,7 +40,7 @@ function getDb(): Database.Database {
   return _db;
 }
 
-function getWriteDb(): Database.Database {
+export function getWriteDb(): Database.Database {
   const db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");

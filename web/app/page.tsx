@@ -1,22 +1,18 @@
-import { getRecentItems, getTagsForItem } from "@/lib/db";
 import { getLocale } from "@/lib/locale";
 import { getDict } from "@/lib/i18n";
-import { SearchForm } from "@/components/search-form";
+import { NewChatInput } from "@/components/chat-bubble";
 
-export default async function SearchPage() {
+export default async function NewChatPage() {
   const locale = await getLocale();
   const t = getDict(locale);
-  const items = getRecentItems(20);
-
-  const tags: Record<string, string[]> = {};
-  for (const item of items) {
-    tags[item.id] = getTagsForItem(item.id);
-  }
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-100 mb-6">{t.search_heading}</h1>
-      <SearchForm initialItems={items} initialTags={tags} dict={t} />
+    <div className="flex flex-col items-center justify-center min-h-[80vh]">
+      <h1 className="text-3xl font-bold text-white mb-2">Rekolto</h1>
+      <p className="text-muted mb-8">{t.chat_empty}</p>
+      <div className="w-full max-w-2xl">
+        <NewChatInput dict={t} />
+      </div>
     </div>
   );
 }

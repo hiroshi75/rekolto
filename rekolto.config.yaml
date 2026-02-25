@@ -33,3 +33,9 @@ scraper:
 database:
   path: ./data/rekolto.db
   backup_dir: ./data/backups
+
+x_crawler:
+  enabled: false
+  interval_hours: 6
+  max_items_per_crawl: 10
+  timeline_url: "https://x.com/home"
