@@ -3,7 +3,7 @@
   "name": "Rekolto Browser Relay",
   "version": "0.1.0",
   "description": "Bridge between Rekolto bot and the browser for fetching JS-rendered pages",
-  "permissions": ["debugger", "tabs", "activeTab"],
+  "permissions": ["debugger", "tabs", "activeTab", "alarms"],
   "background": {
     "service_worker": "background.js"
   },

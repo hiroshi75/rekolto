@@ -185,20 +185,28 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
       html = relayResult.html;
       relayTitle = relayResult.relayTitle;
     } else {
-      // Fallback to HTTP fetch
+      // Relay unavailable — try HTTP but warn it likely won't work
+      logger.warn({ url }, "Browser relay unavailable for relay domain, falling back to HTTP");
       html = await fetchHtml(url, timeout_ms);
     }
   } else {
     html = await fetchHtml(url, timeout_ms);
   }
 
+  // Check if we got meaningful content
   const $ = cheerio.load(html);
+  let content = extractContent($);
+
+  if (content.length < 10 && needsBrowserRelay(url)) {
+    throw new Error(
+      "ブラウザリレーが接続されていないため、このサイトの内容を取得できませんでした。" +
+      "Chrome 拡張が接続されているか確認してください。"
+    );
+  }
 
   const { title: extractedTitle, ogImage, publishedDate } = extractMetadata($);
   // Use relay title if available, otherwise extracted title
   const title = relayTitle || extractedTitle;
-
-  let content = extractContent($);
 
   // Truncate content if it exceeds the configured max length
   if (content.length > max_content_length) {

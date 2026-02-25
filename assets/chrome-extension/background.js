@@ -4,24 +4,46 @@
  * Connects to the local WebSocket server and handles fetch commands by
  * opening a tab, attaching the debugger, grabbing the rendered HTML,
  * and returning it through the WebSocket.
+ *
+ * Uses chrome.alarms to keep the service worker alive (MV3 kills idle
+ * service workers after ~30 seconds).
  */
 
 const WS_URL = "ws://localhost:9333";
 const RECONNECT_INTERVAL_MS = 5000;
+const KEEPALIVE_ALARM = "rekolto-keepalive";
 
 let ws = null;
 let connected = false;
 
+// --- Keep-alive: MV3 service workers die after ~30s of inactivity ---
+
+chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 0.4 }); // ~24 seconds
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === KEEPALIVE_ALARM) {
+    // Ping to keep alive; reconnect if needed
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      connect();
+    }
+  }
+});
+
 // --- WebSocket lifecycle ---
 
 function connect() {
-  if (ws) return;
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+
+  // Clean up previous socket
+  if (ws) {
+    try { ws.close(); } catch {}
+    ws = null;
+  }
 
   try {
     ws = new WebSocket(WS_URL);
   } catch (err) {
     console.error("[Rekolto] WebSocket creation failed:", err);
-    scheduleReconnect();
     return;
   }
 
@@ -57,12 +79,7 @@ function connect() {
     connected = false;
     ws = null;
     console.log("[Rekolto] Disconnected from relay server");
-    scheduleReconnect();
   };
-}
-
-function scheduleReconnect() {
-  setTimeout(connect, RECONNECT_INTERVAL_MS);
 }
 
 function send(data) {
