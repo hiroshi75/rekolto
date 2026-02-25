@@ -1,13 +1,18 @@
-import WebSocket from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { loadConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 
 /**
- * WebSocket relay client for communicating with the Chrome extension.
- * Sends fetch commands to the extension, which opens tabs and returns rendered HTML.
+ * WebSocket relay server that the Chrome extension connects to.
+ * Rekolto sends fetch commands through this server to the extension,
+ * which opens tabs and returns rendered HTML.
+ *
+ * Architecture:
+ *   Rekolto (WS Server :9222) ← Chrome Extension (WS Client)
  */
-export class BrowserRelayClient {
-  private ws: WebSocket | null = null;
+export class BrowserRelayServer {
+  private wss: WebSocketServer | null = null;
+  private extensionSocket: WebSocket | null = null;
   private port: number;
   private pendingRequests = new Map<
     string,
@@ -24,30 +29,25 @@ export class BrowserRelayClient {
   }
 
   /**
-   * Connect to the WebSocket server (Chrome extension side).
+   * Start the WebSocket server and wait for the Chrome extension to connect.
    */
-  connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const url = `ws://localhost:${this.port}`;
-      logger.info({ url }, "Connecting to browser relay");
+  start(): void {
+    if (this.wss) return;
 
-      this.ws = new WebSocket(url);
+    this.wss = new WebSocketServer({ port: this.port });
 
-      const connectTimeout = setTimeout(() => {
-        if (this.ws) {
-          this.ws.terminate();
-          this.ws = null;
-        }
-        reject(new Error(`Browser relay connection timeout (port ${this.port})`));
-      }, 5000);
+    logger.info({ port: this.port }, "Browser relay server listening");
 
-      this.ws.on("open", () => {
-        clearTimeout(connectTimeout);
-        logger.info({ port: this.port }, "Browser relay connected");
-        resolve();
-      });
+    this.wss.on("connection", (ws) => {
+      logger.info("Chrome extension connected to browser relay");
 
-      this.ws.on("message", (data: WebSocket.Data) => {
+      // Only allow one extension connection at a time
+      if (this.extensionSocket) {
+        this.extensionSocket.close();
+      }
+      this.extensionSocket = ws;
+
+      ws.on("message", (data) => {
         try {
           const msg = JSON.parse(data.toString()) as {
             id: string;
@@ -77,31 +77,35 @@ export class BrowserRelayClient {
         }
       });
 
-      this.ws.on("error", (err: Error) => {
-        clearTimeout(connectTimeout);
-        logger.error({ err }, "Browser relay WebSocket error");
-        reject(err);
-      });
-
-      this.ws.on("close", () => {
-        logger.info("Browser relay disconnected");
-        this.ws = null;
+      ws.on("close", () => {
+        logger.info("Chrome extension disconnected from browser relay");
+        if (this.extensionSocket === ws) {
+          this.extensionSocket = null;
+        }
 
         // Reject all pending requests
         for (const [id, pending] of this.pendingRequests) {
           clearTimeout(pending.timer);
-          pending.reject(new Error("Browser relay connection closed"));
+          pending.reject(new Error("Chrome extension disconnected"));
           this.pendingRequests.delete(id);
         }
       });
+
+      ws.on("error", (err) => {
+        logger.error({ err }, "Browser relay extension socket error");
+      });
+    });
+
+    this.wss.on("error", (err) => {
+      logger.error({ err }, "Browser relay server error");
     });
   }
 
   /**
-   * Check if the WebSocket connection is active.
+   * Check if the Chrome extension is connected.
    */
   isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+    return this.extensionSocket !== null && this.extensionSocket.readyState === WebSocket.OPEN;
   }
 
   /**
@@ -110,12 +114,12 @@ export class BrowserRelayClient {
   fetchPage(url: string): Promise<{ html: string; title?: string }> {
     return new Promise((resolve, reject) => {
       if (!this.isConnected()) {
-        reject(new Error("Browser relay not connected"));
+        reject(new Error("Chrome extension not connected to browser relay"));
         return;
       }
 
       const id = String(++this.requestIdCounter);
-      const timeoutMs = 30000; // 30 seconds for page load
+      const timeoutMs = 30000;
 
       const timer = setTimeout(() => {
         this.pendingRequests.delete(id);
@@ -125,53 +129,69 @@ export class BrowserRelayClient {
       this.pendingRequests.set(id, { resolve, reject, timer });
 
       const command = JSON.stringify({ id, action: "fetch", url });
-      this.ws!.send(command);
+      this.extensionSocket!.send(command);
 
-      logger.info({ id, url }, "Sent fetch command to browser relay");
+      logger.info({ id, url }, "Sent fetch command to Chrome extension");
     });
   }
 
   /**
-   * Close the WebSocket connection.
+   * Stop the WebSocket server.
    */
-  disconnect(): void {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+  stop(): void {
+    if (this.extensionSocket) {
+      this.extensionSocket.close();
+      this.extensionSocket = null;
+    }
+    if (this.wss) {
+      this.wss.close();
+      this.wss = null;
+      logger.info("Browser relay server stopped");
     }
   }
 }
 
 // --- Singleton ---
 
-let _relayClient: BrowserRelayClient | null = null;
-let _initAttempted = false;
+let _relayServer: BrowserRelayServer | null = null;
 
 /**
  * Get the browser relay singleton.
- * Returns null if browser_relay is disabled in config or connection failed.
+ * Starts the WS server on first call if browser_relay is enabled in config.
+ * Returns null if disabled or extension is not connected.
  */
-export function getBrowserRelay(): BrowserRelayClient | null {
+export function getBrowserRelay(): BrowserRelayServer | null {
   const config = loadConfig();
 
   if (!config.browser_relay.enabled) {
     return null;
   }
 
-  if (!_relayClient && !_initAttempted) {
-    _initAttempted = true;
-    _relayClient = new BrowserRelayClient(config.browser_relay.ws_port);
-
-    // Attempt to connect in the background; don't block
-    _relayClient.connect().catch((err) => {
-      logger.warn({ err }, "Browser relay connection failed, will use HTTP fallback");
-      _relayClient = null;
-    });
+  if (!_relayServer) {
+    _relayServer = new BrowserRelayServer(config.browser_relay.ws_port);
+    _relayServer.start();
   }
 
-  if (_relayClient && !_relayClient.isConnected()) {
+  if (!_relayServer.isConnected()) {
     return null;
   }
 
-  return _relayClient;
+  return _relayServer;
+}
+
+/**
+ * Start the browser relay server eagerly (call at app startup).
+ * This allows the Chrome extension to connect before any URL is sent.
+ */
+export function startBrowserRelay(): void {
+  const config = loadConfig();
+
+  if (!config.browser_relay.enabled) {
+    return;
+  }
+
+  if (!_relayServer) {
+    _relayServer = new BrowserRelayServer(config.browser_relay.ws_port);
+    _relayServer.start();
+  }
 }
