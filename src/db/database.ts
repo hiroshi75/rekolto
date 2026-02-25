@@ -93,20 +93,18 @@ function runMigrations(db: Database.Database): void {
     );
   `);
 
-  // FTS5 仮想テーブル (CREATE VIRTUAL TABLE IF NOT EXISTS)
+  // FTS5 仮想テーブル（スタンドアロン、item_id は UNINDEXED で検索対象外）
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
       title, content, summary,
-      content='items',
-      content_rowid='rowid'
+      item_id UNINDEXED
     );
   `);
 
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS memory_items_fts USING fts5(
       content,
-      content='memory_items',
-      content_rowid='rowid'
+      memory_item_id UNINDEXED
     );
   `);
 }
