@@ -23,8 +23,8 @@ memory:
     max_suggestions: 3
 
 browser_relay:
-  enabled: false
-  ws_port: 9222
+  enabled: true
+  ws_port: 9333
 
 scraper:
   timeout_ms: 10000

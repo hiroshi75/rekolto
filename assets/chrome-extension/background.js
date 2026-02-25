@@ -6,7 +6,7 @@
  * and returning it through the WebSocket.
  */
 
-const WS_URL = "ws://localhost:9222";
+const WS_URL = "ws://localhost:9333";
 const RECONNECT_INTERVAL_MS = 5000;
 
 let ws = null;

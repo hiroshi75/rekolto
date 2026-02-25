@@ -170,7 +170,7 @@ memory:
 
 browser_relay:
   enabled: false
-  ws_port: 9222
+  ws_port: 9333
 
 scraper:
   timeout_ms: 10000
