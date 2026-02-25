@@ -5,7 +5,12 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 data/backups/
+data/insight-cache-*.json
 .DS_Store
+
+# Web UI
+web/.next/
+web/node_modules/
 
 # Python
 python/.venv/
