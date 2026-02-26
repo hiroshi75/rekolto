@@ -26,6 +26,17 @@ function runWebMigrations(): void {
     } catch {
       // column already exists
     }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS x_crawler_settings (
+        id                  INTEGER PRIMARY KEY CHECK (id = 1),
+        enabled             INTEGER NOT NULL DEFAULT 0,
+        timezone            TEXT NOT NULL DEFAULT 'UTC',
+        scheduled_times     TEXT NOT NULL DEFAULT '[]',
+        max_items_per_crawl INTEGER NOT NULL DEFAULT 10,
+        updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT OR IGNORE INTO x_crawler_settings (id) VALUES (1);
+    `);
   } finally {
     db.close();
   }
@@ -197,6 +208,69 @@ export function getThisWeekActivity(): { itemsAdded: number; searchCount: number
     db.prepare("SELECT COUNT(*) as c FROM search_history WHERE created_at > datetime('now', '-7 days')").get() as { c: number }
   ).c;
   return { itemsAdded, searchCount };
+}
+
+// --- Stats ---
+
+// --- X Crawler Settings ---
+
+export interface XCrawlerSettings {
+  enabled: boolean;
+  timezone: string;
+  scheduled_times: string[];
+  max_items_per_crawl: number;
+}
+
+interface XCrawlerSettingsRow {
+  enabled: number;
+  timezone: string;
+  scheduled_times: string;
+  max_items_per_crawl: number;
+}
+
+export function getXCrawlerSettings(): XCrawlerSettings {
+  const db = getDb();
+  const row = db
+    .prepare(
+      "SELECT enabled, timezone, scheduled_times, max_items_per_crawl FROM x_crawler_settings WHERE id = 1"
+    )
+    .get() as XCrawlerSettingsRow | undefined;
+
+  if (!row) {
+    return { enabled: false, timezone: "UTC", scheduled_times: [], max_items_per_crawl: 10 };
+  }
+
+  let times: string[];
+  try {
+    times = JSON.parse(row.scheduled_times);
+  } catch {
+    times = [];
+  }
+
+  return {
+    enabled: row.enabled === 1,
+    timezone: row.timezone,
+    scheduled_times: times,
+    max_items_per_crawl: row.max_items_per_crawl,
+  };
+}
+
+export function saveXCrawlerSettings(s: XCrawlerSettings): void {
+  const db = getWriteDb();
+  try {
+    db.prepare(
+      `UPDATE x_crawler_settings
+       SET enabled = ?, timezone = ?, scheduled_times = ?, max_items_per_crawl = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = 1`
+    ).run(s.enabled ? 1 : 0, s.timezone, JSON.stringify(s.scheduled_times), s.max_items_per_crawl);
+  } finally {
+    db.close();
+  }
+  // Reset read-only connection so it picks up the change
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
 }
 
 // --- Stats ---

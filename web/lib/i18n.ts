@@ -74,6 +74,16 @@ export interface Dict {
   language: string;
   saved: string;
 
+  // X Crawler Settings
+  x_crawler: string;
+  x_crawler_enabled: string;
+  x_crawler_timezone: string;
+  x_crawler_scheduled_times: string;
+  x_crawler_add_time: string;
+  x_crawler_max_items: string;
+  x_crawler_save: string;
+  x_crawler_no_times: string;
+
   // Chat
   new_chat: string;
   chat_placeholder: string;
@@ -139,6 +149,15 @@ const en: Dict = {
   language: "Language",
   saved: "Saved!",
 
+  x_crawler: "X Crawler",
+  x_crawler_enabled: "Enabled",
+  x_crawler_timezone: "Timezone",
+  x_crawler_scheduled_times: "Scheduled Times",
+  x_crawler_add_time: "Add time",
+  x_crawler_max_items: "Max items per crawl",
+  x_crawler_save: "Save",
+  x_crawler_no_times: "No scheduled times",
+
   new_chat: "New Chat",
   chat_placeholder: "Ask your knowledge base...",
   chat_send: "Send",
@@ -202,6 +221,15 @@ const ja: Dict = {
   settings_heading: "設定",
   language: "言語",
   saved: "保存しました！",
+
+  x_crawler: "Xクローラー",
+  x_crawler_enabled: "有効",
+  x_crawler_timezone: "タイムゾーン",
+  x_crawler_scheduled_times: "スケジュール時刻",
+  x_crawler_add_time: "時刻を追加",
+  x_crawler_max_items: "クロールごとの最大件数",
+  x_crawler_save: "保存",
+  x_crawler_no_times: "スケジュール時刻なし",
 
   new_chat: "新しいチャット",
   chat_placeholder: "ナレッジベースに質問...",
@@ -267,6 +295,15 @@ const zhCN: Dict = {
   language: "语言",
   saved: "已保存！",
 
+  x_crawler: "X爬虫",
+  x_crawler_enabled: "启用",
+  x_crawler_timezone: "时区",
+  x_crawler_scheduled_times: "定时执行",
+  x_crawler_add_time: "添加时间",
+  x_crawler_max_items: "每次抓取最大条数",
+  x_crawler_save: "保存",
+  x_crawler_no_times: "暂无定时",
+
   new_chat: "新对话",
   chat_placeholder: "向知识库提问...",
   chat_send: "发送",
@@ -330,6 +367,15 @@ const zhTW: Dict = {
   settings_heading: "設定",
   language: "語言",
   saved: "已儲存！",
+
+  x_crawler: "X爬蟲",
+  x_crawler_enabled: "啟用",
+  x_crawler_timezone: "時區",
+  x_crawler_scheduled_times: "排程時間",
+  x_crawler_add_time: "新增時間",
+  x_crawler_max_items: "每次抓取上限",
+  x_crawler_save: "儲存",
+  x_crawler_no_times: "尚無排程時間",
 
   new_chat: "新對話",
   chat_placeholder: "向知識庫提問...",
@@ -395,6 +441,15 @@ const es: Dict = {
   language: "Idioma",
   saved: "¡Guardado!",
 
+  x_crawler: "Rastreador de X",
+  x_crawler_enabled: "Activado",
+  x_crawler_timezone: "Zona horaria",
+  x_crawler_scheduled_times: "Horarios programados",
+  x_crawler_add_time: "Agregar horario",
+  x_crawler_max_items: "Máx. elementos por rastreo",
+  x_crawler_save: "Guardar",
+  x_crawler_no_times: "Sin horarios programados",
+
   new_chat: "Nuevo Chat",
   chat_placeholder: "Pregunta a tu base de conocimiento...",
   chat_send: "Enviar",
@@ -459,6 +514,15 @@ const ptBR: Dict = {
   language: "Idioma",
   saved: "Salvo!",
 
+  x_crawler: "Rastreador do X",
+  x_crawler_enabled: "Ativado",
+  x_crawler_timezone: "Fuso horário",
+  x_crawler_scheduled_times: "Horários agendados",
+  x_crawler_add_time: "Adicionar horário",
+  x_crawler_max_items: "Máx. itens por rastreio",
+  x_crawler_save: "Salvar",
+  x_crawler_no_times: "Sem horários agendados",
+
   new_chat: "Novo Chat",
   chat_placeholder: "Pergunte à sua base de conhecimento...",
   chat_send: "Enviar",
@@ -522,6 +586,15 @@ const ko: Dict = {
   settings_heading: "설정",
   language: "언어",
   saved: "저장되었습니다!",
+
+  x_crawler: "X 크롤러",
+  x_crawler_enabled: "활성화",
+  x_crawler_timezone: "시간대",
+  x_crawler_scheduled_times: "예약 시간",
+  x_crawler_add_time: "시간 추가",
+  x_crawler_max_items: "크롤당 최대 항목 수",
+  x_crawler_save: "저장",
+  x_crawler_no_times: "예약된 시간 없음",
 
   new_chat: "새 채팅",
   chat_placeholder: "지식 베이스에 질문하세요...",

@@ -12,33 +12,42 @@ import {
   findOrCreateCategory,
   createMemoryItem,
 } from "../db/memory-store.js";
+import { readCrawlerSettings } from "../db/crawler-settings.js";
 import { loadConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 
+/** Get current HH:MM in the given IANA timezone */
+function currentTimeInTz(timezone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const hour = parts.find((p) => p.type === "hour")?.value ?? "00";
+    const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
+    return `${hour}:${minute}`;
+  } catch {
+    return "00:00";
+  }
+}
+
 export class XCrawler {
   private timer: ReturnType<typeof setInterval> | null = null;
+  private lastFiredMinute: string | null = null;
+  private crawling = false;
 
   start(): void {
-    const config = loadConfig();
-    if (!config.x_crawler.enabled) {
-      logger.info("X crawler is disabled");
-      return;
-    }
+    logger.info("Starting X crawler tick loop (60s interval)");
 
-    const intervalMs = config.x_crawler.interval_hours * 60 * 60 * 1000;
-    logger.info(
-      { intervalHours: config.x_crawler.interval_hours },
-      "Starting X crawler"
-    );
-
-    // Run once after a short delay (30s), then periodically
-    setTimeout(() => {
-      this.crawl().catch((err) => logger.error({ err }, "X crawler error"));
-    }, 30_000);
+    // Run a tick immediately to check
+    this.tick();
 
     this.timer = setInterval(() => {
-      this.crawl().catch((err) => logger.error({ err }, "X crawler error"));
-    }, intervalMs);
+      this.tick();
+    }, 60_000);
   }
 
   stop(): void {
@@ -49,7 +58,39 @@ export class XCrawler {
     }
   }
 
-  private async crawl(): Promise<void> {
+  private tick(): void {
+    if (this.crawling) return;
+
+    let settings;
+    try {
+      settings = readCrawlerSettings();
+    } catch (err) {
+      logger.error({ err }, "X crawler: failed to read settings");
+      return;
+    }
+
+    if (!settings.enabled) return;
+    if (settings.scheduled_times.length === 0) return;
+
+    const now = currentTimeInTz(settings.timezone);
+
+    // Prevent double-fire in the same minute
+    if (now === this.lastFiredMinute) return;
+
+    if (!settings.scheduled_times.includes(now)) return;
+
+    this.lastFiredMinute = now;
+    logger.info({ time: now, timezone: settings.timezone }, "X crawler: scheduled time matched, starting crawl");
+
+    this.crawling = true;
+    this.crawl(settings.max_items_per_crawl)
+      .catch((err) => logger.error({ err }, "X crawler error"))
+      .finally(() => {
+        this.crawling = false;
+      });
+  }
+
+  private async crawl(maxItems: number): Promise<void> {
     const config = loadConfig();
     const relay = getBrowserRelayServer();
 
@@ -89,7 +130,6 @@ export class XCrawler {
       );
 
       // 5. Save relevant tweets (up to max_items_per_crawl)
-      const maxItems = config.x_crawler.max_items_per_crawl;
       const toSave = filtered.slice(0, maxItems);
 
       for (const { index, reason } of toSave) {

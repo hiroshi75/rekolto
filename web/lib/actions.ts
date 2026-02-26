@@ -74,3 +74,13 @@ export async function deleteSessionAction(id: string): Promise<void> {
   chatDb.deleteChatSession(id);
   revalidatePath("/", "layout");
 }
+
+export async function saveXCrawlerSettingsAction(settings: {
+  enabled: boolean;
+  timezone: string;
+  scheduled_times: string[];
+  max_items_per_crawl: number;
+}): Promise<void> {
+  db.saveXCrawlerSettings(settings);
+  revalidatePath("/settings");
+}

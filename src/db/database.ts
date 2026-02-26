@@ -91,6 +91,17 @@ function runMigrations(db: Database.Database): void {
       results    TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- Xクローラー設定
+    CREATE TABLE IF NOT EXISTS x_crawler_settings (
+      id                  INTEGER PRIMARY KEY CHECK (id = 1),
+      enabled             INTEGER NOT NULL DEFAULT 0,
+      timezone            TEXT NOT NULL DEFAULT 'UTC',
+      scheduled_times     TEXT NOT NULL DEFAULT '[]',
+      max_items_per_crawl INTEGER NOT NULL DEFAULT 10,
+      updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT OR IGNORE INTO x_crawler_settings (id) VALUES (1);
   `);
 
   // FTS5 仮想テーブル（スタンドアロン、item_id は UNINDEXED で検索対象外）
