@@ -9,7 +9,9 @@ let _migrated = false;
 function runWebMigrations(): void {
   if (_migrated) return;
   _migrated = true;
-  const db = getWriteDb();
+  const db = new Database(DB_PATH);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
   try {
     db.exec(`
       CREATE TABLE IF NOT EXISTS chat_sessions (
@@ -41,6 +43,7 @@ function getDb(): Database.Database {
 }
 
 export function getWriteDb(): Database.Database {
+  runWebMigrations();
   const db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
