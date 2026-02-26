@@ -166,6 +166,32 @@ function cleanText(text: string): string {
 }
 
 /**
+ * Derive a meaningful title for x.com/twitter.com URLs.
+ * Tries: @username from URL path, then first ~80 chars of content.
+ */
+function deriveTitleForTweet(url: string, content: string): string {
+  try {
+    const { pathname } = new URL(url);
+    // e.g. /username/status/123 → username
+    const match = pathname.match(/^\/([^/]+)/);
+    if (match && match[1] !== "home" && match[1] !== "search") {
+      return `@${match[1]} on X`;
+    }
+  } catch {
+    // ignore
+  }
+
+  // Fall back to first line of content, truncated
+  const firstLine = content.split("\n").find((l) => l.trim().length > 0);
+  if (firstLine && firstLine.trim().length > 0) {
+    const trimmed = firstLine.trim();
+    return trimmed.length > 80 ? trimmed.slice(0, 80) + "…" : trimmed;
+  }
+
+  return "Post from X";
+}
+
+/**
  * Scrape a URL and extract title, content, og:image, and published date.
  * For RELAY_DOMAINS, tries the browser relay first, then falls back to HTTP.
  */
@@ -206,7 +232,16 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
 
   const { title: extractedTitle, ogImage, publishedDate } = extractMetadata($);
   // Use relay title if available, otherwise extracted title
-  const title = relayTitle || extractedTitle;
+  let title = relayTitle || extractedTitle;
+
+  // For x.com/twitter.com, the title is often generic ("X") or "Untitled".
+  // Try to derive a better title from the URL or content.
+  if (
+    (title === "Untitled" || title === "X" || title === "Twitter") &&
+    needsBrowserRelay(url)
+  ) {
+    title = deriveTitleForTweet(url, content);
+  }
 
   // Truncate content if it exceeds the configured max length
   if (content.length > max_content_length) {
